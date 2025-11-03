@@ -1,4 +1,5 @@
 import argparse
+import logging
 import os
 from types import SimpleNamespace
 
@@ -75,6 +76,9 @@ def main():
     args = parser.parse_args()
     debug_mode = args.debug
     config_file = args.config
+
+    if debug_mode:
+        logger.setLevel(logging.DEBUG)
 
     data = load_yml(config_file)
 
