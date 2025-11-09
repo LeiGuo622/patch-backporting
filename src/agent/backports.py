@@ -40,7 +40,7 @@ def initial_agent(project: Project, api_key: str, debug_mode: bool):
 
 
 def do_backport(agent_executor, project, data):
-    log_dir = "logs"
+    log_dir = "../logs"
     os.makedirs(log_dir, exist_ok=True)
     logfile = os.path.join(log_dir, "{}-llm.log".format(data.tag))
     log_handler = FileCallbackHandler(logfile)
