@@ -111,6 +111,49 @@ class Project:
         else:
             return None
 
+    def _apply_error_handling(self, ref: str, revised_patch: str) -> tuple[str, str]:
+        """
+        Generate feedback to llm when an error patch is applied.
+
+        Args:
+            ref (str): The reference of the target repository.
+            revised_patch (str): The patch to be applied.
+
+        Returns:
+            block (str): Bug patch similar code block information.
+            differ (str): Difference between patch context and original code context.
+
+        """
+        path = re.findall(r"--- a/(.*)", revised_patch)[0]
+        revised_patch_line = revised_patch.split("\n")
+        revised_patch_line = [s[1:] for s in revised_patch_line]
+        file = self.repo.tree(ref) / path
+        content = file.data_stream.read().decode("utf-8")
+        lines = content.split("\n")
+
+        contexts, num_context = utils.process_string(revised_patch)
+        lineno = utils.find_most_similar_block("\n".join(contexts), lines, num_context)
+
+        startline = max(lineno - 5, 0)
+        endline = min(lineno + 5 + num_context, len(lines))
+        block = "Here are lines {} through {} of file {} for commit {}.\n".format(
+            startline, endline, path, ref
+        )
+        block += "```code snippet\n"
+        for i in range(startline, endline):
+            block = block + lines[i] + "\n"
+        block += "```\n"
+
+        differ = "```context diff\n"
+        for i, context in enumerate(contexts):
+            if context != lines[lineno - 1 + i]:
+                differ += f"On the line {revised_patch_line.index(context) + 1} of your patch. There is a slight difference between patch and the source code.\n"
+                differ += f"Your patch:             {context}\n"
+                differ += f"Original source code:   {lines[lineno - 1 + i]}\n"
+        differ += "```\n"
+
+        return block, differ
+
     def _apply_hunk(self, ref: str, patch: str) -> str:
         """
         Apply a hunk to a specific ref of the target repository.
@@ -152,23 +195,12 @@ class Project:
             ret = "Patch failed to apply with error, context mismatch.\n"
             ret += "This patch does not apply, you CAN NOT send it to me again. Repeated patches will harm the lives of others.\n"
             ret += "Next I'll give you the context of the previous error patch in the old version, and you should modify the previous error patch according to this section.\n"
-            path = re.findall(r"--- a/(.*)", revised_patch)[0]
-            file = self.repo.tree(ref) / path
-            content = file.data_stream.read().decode("utf-8")
-            lines = content.split("\n")
-            context, num_context = utils.process_string(revised_patch)
-            lineno = utils.find_most_similar_block(context, lines, num_context)
-            startline = max(lineno - 5, 0)
-            endline = min(lineno + 5 + num_context, len(lines))
-            ret += "Here are lines {} through {} of file {} for commit {}.\n".format(
-                startline, endline, path, ref
-            )
-            ret += "```code snippet\n"
-            for i in range(startline, endline):
-                ret = ret + lines[i] + "\n"
-            ret += "```\n"
-            ret += "Please replace the error context in the error patch using the code in the code snippet above.(Including the difference between SPACE and INDENTATION.) At tbe beginning and end of the hunk, ONLY need 3 lines context. For lines that start with '-' and ' ', both need to be matched as context. You MUST never confuse '->' with ''s'.\n"
-            ret += "Or use tools `locate_symbol` and `viewcode` to re-check patch-related code snippet.\n"
+            block, differ = self._apply_error_handling(ref, revised_patch)
+            ret += block
+            ret += f"In addition to that, I've got more detailed error messages for you below where the context of your generated patch differs specifically from the source code context.\n"
+            ret += differ
+            ret += f"Based on the above feedback or use tools `locate_symbol` and `viewcode` to re-check patch-related code snippet., MUST you please modify your patch so that the context present in your patch is exactly the same as the source code to guarantee that git apply can be executed normally.(Including the difference between SPACE and INDENTATION.)\n"
+            ret += "At tbe beginning and end of the hunk, ONLY need 3 lines context. For lines that start with '-' and ' ', both need to be matched as context. You MUST never confuse '->' with ''s'.\n"
         self.repo.git.reset("--hard")
         return ret
 
@@ -187,23 +219,39 @@ class Project:
             subprocess.TimeoutExpired: If the compilation process times out.
 
         """
-        self._checkout(ref)
-        self.repo.git.reset("--hard")
-        ret = ""
-        # apply joined patch
-        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
-            f.write(complete_patch)
         try:
-            self.repo.git.apply([f.name], v=True)
-            logger.debug(f"The joined patch could {f.name} be applied successfully")
-        except Exception as e:
-            logger.debug(f"Failed to apply Complete patch {f.name}")
-            # TODO: give feedback to LLM about which line can not be applied
-            apply_result = ""
-            ret += f"The joined patch could not be applied successfully, please try to revise the patch with provided tools and the following error message during applying the patch: {apply_result}\n"
             self.repo.git.reset("--hard")
+            self._checkout(ref)
+        except:
+            ret = f"Oops, it looks like you give a error commit id.\n"
+            ret += "Please check commit id and retry to check the patch.\n"
             return ret
-
+        # apply joined patch
+        ret = ""
+        pps = utils.split_patch(complete_patch, False)
+        for idx, pp in enumerate(pps):
+            revised_patch, fixed = utils.revise_patch(pp, self.dir)
+            with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
+                f.write(revised_patch)
+            try:
+                self.repo.git.apply([f.name], v=True)
+                logger.debug(
+                    f"The joined patch hunk {idx} could be applied successfully, file {f.name}"
+                )
+            except Exception as e:
+                logger.debug(
+                    f"Failed to apply Complete patch hunk {idx}, file {f.name}"
+                )
+                # TODO: give feedback to LLM about which line can not be applied
+                ret = f"For the patch you just generated, there was an APPLY failure during testing. Specifically there was a context mismatch in hunk {idx} across the patch, below is part of the feedback I found for you.\n"
+                block, differ = self._apply_error_handling(ref, revised_patch)
+                ret += block
+                ret += f"Here is the source code near the hunk context for your reference, a good patch context should look exactly like the source code.\n"
+                ret += f"In addition to that, I've got more detailed error messages for you below where the context of your generated patch differs specifically from the source code context.(The line numbers below are all line numbers in the hunk, not the entire patch.)\n"
+                ret += differ
+                ret += f"Based on the above feedback, MUST you please modify only hunk {idx} in the patch and leave the other hunks untouched so that the context present in hunk {idx} is exactly the same as the source code to guarantee that git apply can be executed normally.\n"
+                self.repo.git.reset("--hard")
+                return ret
         # compile the patch
         logger.debug("Start compile the patched source code")
         if not os.path.exists(os.path.join(self.dir, "build.sh")):
@@ -219,7 +267,7 @@ class Project:
         )
         try:
             stdout, stderr = build_process.communicate(timeout=60 * 60)
-            compile_result = stderr.decode("utf-8")
+            compile_result = stdout.decode("utf-8")
         except subprocess.TimeoutExpired:
             build_process.kill()
             ret += f"The compilation process of the patched source code is timeout. "
@@ -289,7 +337,7 @@ class Project:
             self.testcase_succeeded = True
         return ret
 
-    def _run_poc(self) -> str:
+    def _run_poc(self, complete_patch) -> str:
         """
         Runs the Proof of Concept (PoC) after running the testcase.
 
@@ -337,6 +385,8 @@ class Project:
         else:
             logger.info(f"PoC test                          PASS")
             ret += "Existing PoC could NOT TRIGGER the bug, which means your patch successfully fix the bug! I really thank you for your great efforts.\n"
+            self.succeeded_patches.clear()
+            self.succeeded_patches.append(complete_patch)
             self.poc_succeeded = True
         return ret
 
@@ -363,7 +413,7 @@ class Project:
                 and self.testcase_succeeded
                 and not self.poc_succeeded
             ):
-                ret += self._run_poc()
+                ret += self._run_poc(patch)
             return ret
         else:
             return self._apply_hunk(ref, patch)

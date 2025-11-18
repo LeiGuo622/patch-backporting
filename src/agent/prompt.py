@@ -95,7 +95,7 @@ Below is the patch you need to backport:
 ```
 
 According to the patch above, I have formed a patch that can be applied to the target release. I need your help to VALIDATE and REVISE the patch until it could really fix the vuln.
-Below is the patch I form: 
+Below is the patch I form, we call it complete_patch: 
 ```diff
 {complete_patch}
 ```
@@ -113,5 +113,5 @@ If the patch can not pass above validation, you need to REVISE the patch with th
 Now, I have tried to compiled the patched code, the result is:
 {compile_ret}
 
-Please start to VALIDATE the patch and REVISE it if necessary.
+Please start to VALIDATE the patch and REVISE it if necessary. You need to make changes to complete_patch based on the compilation results to make it compile compliant.
 """

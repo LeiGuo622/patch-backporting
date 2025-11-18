@@ -61,9 +61,8 @@ def process_string(input_string: str) -> tuple[str, int]:
             processed_lines.append(line)
 
     processed_lines_count = len(processed_lines)
-    processed_string = "\n".join(processed_lines)
 
-    return processed_string, processed_lines_count
+    return processed_lines, processed_lines_count
 
 
 def find_sub_list(lst, neddle):
@@ -200,12 +199,13 @@ def revise_patch(patch: str, project_path: str) -> tuple[str, bool]:
         return patch, False
 
 
-def split_patch(patch):
+def split_patch(patch: str, flag_commit: bool) -> str:
     """
     Split a patch into individual blocks.
 
     Args:
         patch (str): The patch to be split.
+        flag_commit (bool): Whether the patch exists commit message.
 
     Yields:
         str: Each individual block of the patch.
@@ -248,10 +248,14 @@ def split_patch(patch):
         for line_no in range(len(lines)):
             if lines[line_no].startswith("--- a/"):
                 if last_line >= 0:
-                    for x in split_block(lines[last_line : line_no - 2]):
-                        yield message + x
-                if last_line == -1:
-                    message = "\n".join(lines[: line_no - 2])
+                    if flag_commit:
+                        for x in split_block(lines[last_line : line_no - 2]):
+                            yield message + x
+                    else:
+                        for x in split_block(lines[last_line:line_no]):
+                            yield message + x
+                if last_line == -1 and flag_commit:
+                    message = "\n".join(lines[: max(line_no - 2, 0)])
                 if (
                     lines[line_no].endswith(".rst")
                     or lines[line_no].endswith(".yaml")

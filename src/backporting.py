@@ -101,11 +101,11 @@ def main():
         )
         exit(1)
 
-    project = Project(data.project_url, data.project_dir, data.patch_dataset_dir)
-    agent_executor = initial_agent(project, data.openai_key, debug_mode)
+    project = Project(data.project_url, data.project_dir, data.error_message)
+    agent_executor, llm = initial_agent(project, data.openai_key, debug_mode)
 
     before_usage = get_usage(data.openai_key)
-    do_backport(agent_executor, project, data)
+    do_backport(agent_executor, project, data, llm)
     after_usage = get_usage(data.openai_key)
     logger.debug(
         f"This patch total cost: ${(after_usage['total_cost'] - before_usage['total_cost']):.2f}"
