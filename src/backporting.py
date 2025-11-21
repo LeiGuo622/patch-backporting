@@ -102,6 +102,7 @@ def main():
         exit(1)
 
     project = Project(data.project_url, data.project_dir, data.error_message)
+    project.repo.git.clean("-fdx")
     if (
         not project._checkout(data.new_patch)
         or not project._checkout(data.target_release)
