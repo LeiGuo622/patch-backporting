@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import yaml
 
-from agent.backports import do_backport, initial_agent
+from agent.invoke_llm import do_backport, initial_agent
 from check.usage import get_usage
 from tools.logger import add_file_handler, logger
 from tools.project import Project
