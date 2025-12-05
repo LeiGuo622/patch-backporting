@@ -122,7 +122,7 @@ def main():
     log_dir = "../logs"
     os.makedirs(log_dir, exist_ok=True)
     now = datetime.datetime.now().strftime("%m%d%H%M")
-    logfile = os.path.join(log_dir, f"{data.tag}-{now}.log")
+    logfile = os.path.join(log_dir, f"{data.project}-{data.tag}-{now}.log")
     add_file_handler(logger, logfile)
 
     # use LLM to backport
