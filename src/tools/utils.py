@@ -238,7 +238,6 @@ def split_patch(patch: str, flag_commit: bool) -> str:
         lines = patch.splitlines()
         message = ""
         last_line = -1
-        fixed = False
         for line_no in range(len(lines)):
             if lines[line_no].startswith("--- a/"):
                 if last_line >= 0:
@@ -255,6 +254,25 @@ def split_patch(patch: str, flag_commit: bool) -> str:
                     or lines[line_no].endswith(".yaml")
                     or lines[line_no].endswith(".yml")
                     or lines[line_no].endswith(".md")
+                ):
+                    last_line = -2
+                else:
+                    last_line = line_no
+            if lines[line_no].startswith("--- /dev/null"):
+                if last_line >= 0:
+                    if flag_commit:
+                        for x in split_block(lines[last_line : line_no - 3]):
+                            yield message + x
+                    else:
+                        for x in split_block(lines[last_line:line_no]):
+                            yield message + x
+                if last_line == -1 and flag_commit:
+                    message = "\n".join(lines[: max(line_no - 3, 0)])
+                if (
+                    lines[line_no + 1].endswith(".rst")
+                    or lines[line_no + 1].endswith(".yaml")
+                    or lines[line_no + 1].endswith(".yml")
+                    or lines[line_no + 1].endswith(".md")
                 ):
                     last_line = -2
                 else:
