@@ -1,7 +1,7 @@
 import os
 import re
 import traceback
-from typing import List
+from typing import Generator, List, Tuple
 
 import Levenshtein
 
@@ -37,7 +37,7 @@ def find_most_similar_block(
     return best_start_index
 
 
-def process_string(input_string: str) -> tuple[str, int]:
+def process_string(input_string: str) -> Tuple[str, int]:
     """
     Process the input string by removing certain lines and returning the processed string and the count of processed lines.
 
@@ -65,7 +65,7 @@ def process_string(input_string: str) -> tuple[str, int]:
     return processed_lines, processed_lines_count
 
 
-def find_sub_list(lst, neddle):
+def find_sub_list(lst: List, needle: List) -> List[int]:
     """
     Find all occurrences of a sublist in a given list using the Knuth-Morris-Pratt (KMP) algorithm.
 
@@ -89,14 +89,14 @@ def find_sub_list(lst, neddle):
             next[i] = j
         return next
 
-    next = get_next(neddle)
+    next = get_next(needle)
     i = 0
     j = 0
     while i < len(lst):
-        if lst[i] == neddle[j]:
+        if lst[i] == needle[j]:
             i += 1
             j += 1
-            if j == len(neddle):
+            if j == len(needle):
                 match_pos.append(i - j)
                 j = next[j - 1]
         else:
@@ -107,7 +107,7 @@ def find_sub_list(lst, neddle):
     return match_pos
 
 
-def revise_patch(patch: str, project_path: str) -> tuple[str, bool]:
+def revise_patch(patch: str, project_path: str) -> Tuple[str, bool]:
     def revise_hunk(lines: list[str]) -> tuple[str, bool]:
         if len(lines[-1]) == 0:
             lines = lines[:-1]
@@ -193,7 +193,7 @@ def revise_patch(patch: str, project_path: str) -> tuple[str, bool]:
         return patch, False
 
 
-def split_patch(patch: str, flag_commit: bool) -> str:
+def split_patch(patch: str, flag_commit: bool) -> Generator[str, None, None]:
     """
     Split a patch into individual blocks.
 

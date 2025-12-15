@@ -2,6 +2,7 @@ import os
 import re
 import subprocess
 import tempfile
+from typing import List, Tuple
 
 from git import Repo
 from langchain_core.tools import tool
@@ -23,7 +24,7 @@ class Project:
         self.testcase_succeeded = False
         self.poc_succeeded = False
 
-    def _checkout(self, ref: str):
+    def _checkout(self, ref: str) -> None:
         self.repo.git.reset("--hard")
         self.repo.git.checkout(ref)
 
@@ -33,7 +34,7 @@ class Project:
         except:
             return "Error commit id, please check if the commit id is correct."
 
-    def _prepare(self):
+    def _prepare(self) -> None:
         """
         Prepares the project by generating a symbol map using ctags.
 
@@ -89,7 +90,7 @@ class Project:
             ret.append(lines[i])
         return "\n".join(ret)
 
-    def _locate_symbol(self, ref: str, symbol: str) -> list[tuple[str, int]] | None:
+    def _locate_symbol(self, ref: str, symbol: str) -> List[Tuple[str, int]] | None:
         """
         Locate a symbol in a specific ref of the target repository.
 
@@ -98,7 +99,7 @@ class Project:
             symbol (str): The symbol to locate.
 
         Returns:
-            list[tuple[str, int]]: File path and code lines.
+            List[Tuple[str, int]] | None: File path and code lines.
         """
         # XXX: Analyzing ctags file everytime locate symbol is time-consuming.
         self._checkout(ref)
@@ -108,7 +109,7 @@ class Project:
         else:
             return None
 
-    def _apply_error_handling(self, ref: str, revised_patch: str) -> tuple[str, str]:
+    def _apply_error_handling(self, ref: str, revised_patch: str) -> Tuple[str, str]:
         """
         Generate feedback to llm when an error patch is applied.
 
@@ -117,8 +118,7 @@ class Project:
             revised_patch (str): The patch to be applied.
 
         Returns:
-            block (str): Bug patch similar code block information.
-            differ (str): Difference between patch context and original code context.
+            Tuple[str, str]: Bug patch similar code block information and difference between patch context and original code context.
 
         """
         path = re.findall(r"--- a/(.*)", revised_patch)[0]
@@ -160,12 +160,27 @@ class Project:
         return block, differ
 
     def _apply_file_move_handling(self, ref: str, old_patch: str) -> str:
+        """
+        If a patch cannot apply for "No such file", try to find the symbol and apply the patch to the correct file.
+
+        Args:
+            ref (str): The reference string.
+            old_patch (str): The patch that raises "No such file" when apply.
+
+        Returns:
+            str: If the symbol is found, a message indicating the current file path.
+
+        Raises:
+            SystemExit: If the symbol or file cannot be found or the patch cannot be applied directly.
+
+        """
         ret = ""
         missing_file_path = re.findall(r"--- a/(.*)", old_patch)[0]
         # @@ -135,7 +135,6 @@ struct ksmbd_transport_ops {
         # @@ -416,13 +416,7 @@ static void stop_sessions(void)
         symbol_name = re.findall(r"\b\w+(?=\s*[{\(])", old_patch)[0]
         symbol_locations = self._locate_symbol(ref, symbol_name)
+
         if not symbol_locations:
             logger.debug(f"No {missing_file_path} and no {symbol_name}() in the repo.")
             # TODO: return what to LLM
