@@ -138,18 +138,30 @@ def revise_patch(patch: str, project_path: str) -> Tuple[str, bool]:
         return header + hunk, fixed
 
     def revise_block(lines: list[str]) -> tuple[list[str], bool]:
-        file_path_a = re.findall(r"--- a/(.*)", lines[0])[0]
-        file_path_b = re.findall(r"\+\+\+ b/(.*)", lines[1])[0]
-        fixed_file_path_a = os.path.normpath(file_path_a)
-        fixed_file_path_b = os.path.normpath(file_path_b)
+        try:
+            file_path_a = re.findall(r"--- a/(.*)", lines[0])[0]
+            fixed_file_path_a = os.path.normpath(file_path_a)
+        except:
+            file_path_a = fixed_file_path_a = lines[0]
+
+        try:
+            file_path_b = re.findall(r"\+\+\+ b/(.*)", lines[1])[0]
+            fixed_file_path_b = os.path.normpath(file_path_b)
+        except:
+            file_path_b = fixed_file_path_b = lines[1]
+
         block_fixed = (
             file_path_a != fixed_file_path_a or file_path_b != fixed_file_path_b
         )
+        assert (
+            (file_path_a == file_path_b and fixed_file_path_a == fixed_file_path_b)
+            or fixed_file_path_a == "--- /dev/null"
+            or fixed_file_path_b == "--- /dev/null"
+        )
 
-        assert file_path_a == file_path_b and fixed_file_path_a == fixed_file_path_b
         fixed_lines = [
-            f"--- a/{fixed_file_path_a}",
-            f"+++ b/{fixed_file_path_b}",
+            f"--- a/{fixed_file_path_a}".replace("a/--- ", ""),
+            f"+++ b/{fixed_file_path_b}".replace("b/--- ", ""),
         ]
 
         last_line = -1
@@ -174,7 +186,9 @@ def revise_patch(patch: str, project_path: str) -> Tuple[str, bool]:
         last_line = -1
         fixed = False
         for line_no in range(len(lines)):
-            if lines[line_no].startswith("--- a/"):
+            if lines[line_no].startswith("--- a/") or lines[line_no].startswith(
+                "--- /dev/null"
+            ):
                 if last_line != -1:
                     block_lines, block_fixed = revise_block(lines[last_line:line_no])
                     fixed_lines += block_lines
