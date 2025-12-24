@@ -109,7 +109,7 @@ def find_sub_list(lst: List, needle: List) -> List[int]:
 
 def revise_patch(patch: str, project_path: str) -> Tuple[str, bool]:
     def revise_hunk(lines: list[str]) -> tuple[str, bool]:
-        if len(lines[-1]) == 0:
+        if len(lines[-1]) == 0 or "\ No newline at end of file" in lines[-1]:
             lines = lines[:-1]
         orignal_line_number = sum(1 for line in lines[1:] if not line.startswith("+"))
         patched_line_number = sum(1 for line in lines[1:] if not line.startswith("-"))
