@@ -239,6 +239,7 @@ class Project:
                 ret += self._apply_file_move_handling(ref, revised_patch)
 
             elif "patch does not apply" in e.stderr:
+                # else:
                 ret += "This patch does not apply because of context mismatch, you CAN NOT send it to me again. Repeated patches will harm the lives of others.\n"
                 ret += "Next I'll give you the context of the previous error patch in the old version, and you should modify the previous error patch according to this section.\n"
                 block, differ = self._apply_error_handling(ref, revised_patch)
@@ -249,9 +250,14 @@ class Project:
                 ret += "At tbe beginning and end of the hunk, MUST has at least 3 lines context. For lines that start with '-' and ' ', both need to be matched as context. You MUST never confuse '->' with ''s'.\n"
 
             elif "corrupt patch" in e.stderr:
+                ret += "The patch you generated was detected as a corrupt patch, please check that one of `-`, `+`, ` ` (sapce) is added at the beginning of each line in the patch.\n"
+                ret += e.stderr
+                ret += "\nYou must add space before the line according to the stderr info.\n"
+                ret += "If you respond the same patch, many lifes will be killed because of you.\n"
+                return ret
                 # TODO: return what to LLM
                 # format error
-                pass
+                # pass
 
         self.repo.git.reset("--hard")
         return ret
@@ -274,6 +280,9 @@ class Project:
         # apply joined patch
         self._checkout(ref)
         ret = ""
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
+            f.write(complete_patch)
+            logger.debug(f"The completed patch file {f.name}")
         pps = utils.split_patch(complete_patch, False)
         for idx, pp in enumerate(pps):
             revised_patch, fixed = utils.revise_patch(pp, self.dir)
