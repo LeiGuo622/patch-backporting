@@ -23,6 +23,7 @@ blacklist = [
     ".uuid",
     ".test",
     "manifest",
+    ".xml",
 ]
 
 
