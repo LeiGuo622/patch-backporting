@@ -24,6 +24,8 @@ blacklist = [
     ".test",
     "manifest",
     ".xml",
+    "_test.go",
+    ".json",
 ]
 
 
