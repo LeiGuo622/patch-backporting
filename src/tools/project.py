@@ -272,20 +272,25 @@ class Project:
                 except:
                     pass
 
-            if "corrupt patch" in e.stderr:
-                ret += "The patch you generated was detected as a corrupt patch, please check that one of `-`, `+`, ` ` (sapce) is added at the beginning of each line in the patch.\n"
-                ret += e.stderr
-                ret += "\nYou must add space before the line according to the stderr info.\n"
-                ret += "If you respond the same patch, many lifes will be killed because of you.\n"
+            elif "corrupt patch" in e.stderr:
+                err_lineno = re.findall(r"at line ([\d]+)", e.stderr)[0]
+                err_lineno = int(err_lineno)
+                with open(f.name, "r") as file:
+                    lines = file.readlines()
+                    err_line = lines[err_lineno - 1].strip()
+                ret += "Please ensure ALL lines are starting with `-`, `+` or ` `(space). For example, incorrect: '\\n', '\\t', CORRECT: ' \\n', ' \\t'.\n"
+                ret += f"`{err_line}`(line {err_lineno}) should start with ` `(space), please add ` ` at the beginning of the line.\n"
+                ret += "DO NOT validate same patch, otherwise many lives will be killed because of you.\n"
             else:
-                ret += "This patch does not apply because of context mismatch, you CAN NOT send it to me again. Repeated patches will harm the lives of others.\n"
-                ret += "Next I'll give you the context of the previous error patch in the old version, and you should modify the previous error patch according to this section.\n"
+                ret += "This patch does not apply because of CONTEXT MISMATCH. Context are patch lines that already exist in the file, that is, lines starting with ` ` and `-`. You should modify the error patch according to the context of older version.\n"
                 block, differ = self._apply_error_handling(ref, revised_patch)
                 ret += block
-                ret += f"In addition to that, I've got more detailed error messages for you below where the context of your generated patch differs specifically from the source code context.\n"
+                ret += "Besides, here is detailed info about how the context differs between the patch and the old version.\n"
                 ret += differ
-                ret += f"Based on the above feedback or use tools `locate_symbol` and `viewcode` to re-check patch-related code snippet. Please modify your patch so that the context in your patch is exactly the same as the source code, including the difference between SPACE and INDENTATION.\n"
-                ret += "At tbe beginning and end of the hunk, MUST has at least 3 lines context. For lines that start with '-' and ' ', both need to be matched as context. You MUST never confuse '->' with ''s'.\n"
+                ret += "Please modify the patch so that the context is TOTALLY IDENTICAL with the old version, including BLANK LINE and INDENTATION. "
+                ret += "At the beginning and end of the hunk, MUST has at least 3 lines context."
+                if "'s" in revised_patch:
+                    ret += " You should use '->' in code, rather than ''s'.\n"
 
         self.repo.git.reset("--hard")
         return ret
@@ -358,11 +363,24 @@ class Project:
             build_process.kill()
             ret += f"The compilation process of the patched source code is timeout. "
             self.repo.git.reset("--hard")
+            logger.warning(
+                "Timeout in project compilation. Please check patch manually!"
+            )
+            for patch in self.succeeded_patches:
+                logger.info(patch)
+            exit(0)
             return ret
 
         if build_process.returncode != 0:
             logger.info(f"Compilation                       FAILED")
-            logger.debug(f"{compile_result}")
+            error_lines = "\n".join(
+                [
+                    line
+                    for line in compile_result.splitlines()
+                    if "error:" in line.lower()
+                ]
+            )
+            logger.debug(error_lines)
             ret += "The source code could not be COMPILED successfully after applying the patch. "
             ret += "Next I'll give you the error message during compiling, and you should modify the error patch. "
             ret += f"Here is the error message:\n{compile_result}\n"
@@ -436,6 +454,8 @@ class Project:
         if not os.path.exists(os.path.join(self.dir, "poc.sh")):
             logger.debug("No poc.sh file found, considered as PoC passed.")
             self.poc_succeeded = True
+            self.succeeded_patches.clear()
+            self.succeeded_patches.append(complete_patch)
             ret += "Existing PoC could NOT TRIGGER the bug, which means your patch successfully fix the bug! I really thank you for your great efforts.\n"
             return ret
         poc_process = subprocess.Popen(

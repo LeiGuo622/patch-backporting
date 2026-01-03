@@ -110,6 +110,7 @@ If the patch can not pass above validation, you need to REVISE the patch with th
 1. Review the patch of the newer version. 
 2. Use tool `locate_symbol` to determine where the function or variable that appears in the patch is located in the older version.
 3. Use tool `viewcode` to view the location of the symbol given by `locate_symbol`. Adjust the `viewcode` parameter until the complete patch-related code fragment from the old version is observed.
+4. Revise the patch that I give, just fix the root cause and return the completed patch to validate.
 
 Now, I have tried to compiled the patched code, the result is:
 {compile_ret}

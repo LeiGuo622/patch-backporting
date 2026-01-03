@@ -16,7 +16,7 @@ def initial_agent(project: Project, api_key: str, debug_mode: bool):
     base_url = "https://api.openai.com/v1"
 
     llm = ChatOpenAI(
-        temperature=0,
+        temperature=0.5,
         model="gpt-4-turbo",
         api_key=api_key,
         openai_api_base=base_url,
@@ -55,7 +55,7 @@ def do_backport(
         else:
             try:
                 similar_block = re.findall(
-                    r"section.\n(.*?)\nIn addition", ret, re.DOTALL
+                    r"version.\n(.*?)\nBesides,", ret, re.DOTALL
                 )[0]
             except:
                 similar_block = "Something error in finding similar block\n"
@@ -81,7 +81,7 @@ def do_backport(
     project.all_hunks_applied_succeeded = True
     logger.info(f"Aplly all hunks in the patch      PASS")
     complete_patch = "\n".join(project.succeeded_patches)
-    project.repo.git.clean("-fd")
+    project.repo.git.clean("-fdx")
     for file in os.listdir(data.patch_dataset_dir):
         if os.path.exists(f"{data.project_dir}{file}"):
             os.remove(f"{data.project_dir}{file}")
