@@ -12,11 +12,15 @@ from tools.logger import logger
 
 
 class Project:
-    def __init__(self, project_url: str, dir: str, err_msg: str = "no err_msg"):
+    def __init__(self, project_url: str, dir: str, err_msg: str):
         self.project_url = project_url
         self.dir = dir
         self.repo = Repo(dir)
+
+        if not err_msg:
+            err_msg = "no err_msg"
         self.err_msg = err_msg
+
         self.succeeded_patches = []
         self.round_succeeded = False
         self.all_hunks_applied_succeeded = False
