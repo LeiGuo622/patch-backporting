@@ -195,40 +195,50 @@ class Project:
             old_patch (str): The patch that raises "No such file" when apply.
 
         Returns:
-            str: If the symbol is found, a message indicating the current file path.
-
-        Raises:
-            SystemExit: If the symbol or file cannot be found or the patch cannot be applied directly.
-
+            str: If the file is found, return the current file path. Else, return all possible file paths.
         """
         ret = ""
         missing_file_path = re.findall(r"--- a/(.*)", old_patch)[0]
-        # @@ -135,7 +135,6 @@ struct ksmbd_transport_ops {
-        # @@ -416,13 +416,7 @@ static void stop_sessions(void)
-        symbol_name = re.findall(r"\b\w+(?=\s*[{\(])", old_patch)[0]
-        symbol_locations = self._locate_symbol(ref, symbol_name)
 
-        if not symbol_locations:
-            logger.debug(f"No {missing_file_path} and no {symbol_name}() in the repo.")
-            # TODO: return what to LLM
-            # can not find symbol, the symbol is renamed or removed
-            return "Find file error"
-        else:
-            logger.debug(f"Find {symbol_name} in {symbol_locations}.")
-            find_file = False
-            for item in symbol_locations:
-                file_path = item[0]
-                new_patch = old_patch.replace(missing_file_path, file_path)
-                if "successfully" in self._apply_hunk(ref, new_patch):
-                    find_file = True
-                    logger.debug(f"{missing_file_path} has been moved to {file_path}.")
-                    ret += f"{missing_file_path} has been moved to {file_path}. Please use --- a/{file_path} in your patch.\n"
-                    break
-            if not find_file:
-                logger.debug(f"Patch can not be applied to {symbol_locations}.")
-                # TODO: return what to LLM
-                # find symbol, but patch can not apply directly
-                return "Find file error"
+        # locate target file by symbol or utils.find_most_similar_files
+        try:
+            # XXX: find symbol: the word before the first '{' or '('
+            # @@ -135,7 +135,6 @@ struct ksmbd_transport_ops {
+            # @@ -416,13 +416,7 @@ static void stop_sessions(void)
+            symbol_name = re.findall(r"\b\w+(?=\s*[{\(])", old_patch)[0]
+            symbol_locations = self._locate_symbol(ref, symbol_name)
+            if not symbol_locations:
+                logger.debug(
+                    f"No {missing_file_path} and no {symbol_name} in the repo."
+                )
+                file_paths = utils.find_most_similar_files(
+                    missing_file_path.split("/")[-1], self.dir
+                )
+            else:
+                logger.debug(f"Find {symbol_name} in {symbol_locations}.")
+                file_paths = [item[0] for item in symbol_locations]
+        except:
+            logger.debug("Can not find a symbol in given patch.")
+            file_paths = utils.find_most_similar_files(
+                missing_file_path.split("/")[-1], self.dir
+            )
+
+        # try to apply patch to the target files
+        find_file = False
+        for file_path in file_paths:
+            new_patch = old_patch.replace(missing_file_path, file_path)
+            logger.debug(f"Try to apply patch to {file_path}.")
+            if "successfully" in self._apply_hunk(ref, new_patch):
+                find_file = True
+                logger.debug(f"{missing_file_path} has been moved to {file_path}.")
+                ret += f"{missing_file_path} has been moved to {file_path}. Please use --- a/{file_path} in your patch.\n"
+                break
+
+        # patch can not apply directly
+        if not find_file:
+            logger.debug(f"Patch can not be applied to {file_paths}.")
+            # find symbol, but patch can not apply directly
+            return f"The target file has been moved, here is possible file paths:{file_paths}\n"
         return ret
 
     def _apply_hunk(self, ref: str, patch: str) -> str:
@@ -263,15 +273,8 @@ class Project:
         except Exception as e:
             logger.debug(f"{e.stderr}")
             if "No such file" in e.stderr:
-                try:
-                    find_ret = self._apply_file_move_handling(ref, revised_patch)
-                    if "Find file error" not in find_ret:
-                        ret += find_ret
-                        self.repo.git.reset("--hard")
-                        return ret
-                except:
-                    pass
-
+                find_ret = self._apply_file_move_handling(ref, revised_patch)
+                ret += find_ret
             elif "corrupt patch" in e.stderr:
                 err_lineno = re.findall(r"at line ([\d]+)", e.stderr)[0]
                 err_lineno = int(err_lineno)
