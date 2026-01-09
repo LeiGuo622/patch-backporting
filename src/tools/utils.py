@@ -166,6 +166,7 @@ def find_sub_list(lst: List, needle: List) -> List[int]:
 
 def revise_patch(patch: str, project_path: str) -> Tuple[str, bool]:
     def revise_hunk(lines: list[str]) -> tuple[str, bool]:
+        # fix wrong line number
         if len(lines[-1]) == 0 or "\ No newline at end of file" in lines[-1]:
             lines = lines[:-1]
         orignal_line_number = sum(1 for line in lines[1:] if not line.startswith("+"))
@@ -175,19 +176,18 @@ def revise_patch(patch: str, project_path: str) -> Tuple[str, bool]:
         chunks = re.findall(r"@@ -(\d+),(\d+) \+(\d+),(\d+) @@(.*)", lines[0])[0]
         if chunks[0] != chunks[2]:
             fixed = True
-        orignal_content = []
-        patched_content = []
 
+        # fix corrupt patch
+        revised_lines = []
         for line in lines[1:]:
-            if line.startswith("-"):
-                orignal_content.append(line[1:])
-            elif line.startswith("+"):
-                patched_content.append(line[1:])
-            elif line.startswith(" "):
-                orignal_content.append(line[1:])
-                patched_content.append(line[1:])
+            if len(line) == 0:
+                revised_lines.append(" ")
+            elif line.startswith("\t"):
+                revised_lines.append(" " + line)
+            else:
+                revised_lines.append(line)
 
-        hunk = "\n".join(lines[1:])
+        hunk = "\n".join(revised_lines)
 
         header = f"@@ -{chunks[0]},{orignal_line_number} +{chunks[2]},{patched_line_number} @@{chunks[4]}\n"
 

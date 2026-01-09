@@ -276,14 +276,7 @@ class Project:
                 find_ret = self._apply_file_move_handling(ref, revised_patch)
                 ret += find_ret
             elif "corrupt patch" in e.stderr:
-                err_lineno = re.findall(r"at line ([\d]+)", e.stderr)[0]
-                err_lineno = int(err_lineno)
-                with open(f.name, "r") as file:
-                    lines = file.readlines()
-                    err_line = lines[err_lineno - 1].strip()
-                ret += "Please ensure ALL lines are starting with `-`, `+` or ` `(space). For example, incorrect: '\\n', '\\t', CORRECT: ' \\n', ' \\t'.\n"
-                ret += f"`{err_line}`(line {err_lineno}) should start with ` `(space), please add ` ` at the beginning of the line.\n"
-                ret += "DO NOT validate same patch, otherwise many lives will be killed because of you.\n"
+                raise Exception("Unexpected corrupt patch")
             else:
                 ret += "This patch does not apply because of CONTEXT MISMATCH. Context are patch lines that already exist in the file, that is, lines starting with ` ` and `-`. You should modify the error patch according to the context of older version.\n"
                 block, differ = self._apply_error_handling(ref, revised_patch)
