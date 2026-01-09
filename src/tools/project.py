@@ -129,7 +129,7 @@ class Project:
         path = re.findall(r"--- a/(.*)", revised_patch)[0]
         revised_patch_line = revised_patch.split("\n")
         revised_patch_line = [s[1:] for s in revised_patch_line]
-        contexts, num_context = utils.process_string(revised_patch)
+        contexts, num_context = utils.extract_context(revised_patch)
         lineno = -1
         lines = []
         min_distance = float("inf")

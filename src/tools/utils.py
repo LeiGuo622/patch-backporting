@@ -94,7 +94,7 @@ def find_most_similar_block(
     return best_start_index, min_distance
 
 
-def process_string(input_string: str) -> Tuple[str, int]:
+def extract_context(input_string: str) -> Tuple[str, int]:
     """
     Process the input string by removing certain lines and returning the processed string and the count of processed lines.
 
@@ -107,15 +107,11 @@ def process_string(input_string: str) -> Tuple[str, int]:
     lines = input_string.split("\n")
     processed_lines = []
 
-    for line in lines[3:-1]:
+    for line in lines:
         if line.startswith(" "):
             processed_lines.append(line[1:])
         elif line.startswith("-"):
             processed_lines.append(line[1:])
-        elif line.startswith("+"):
-            continue
-        else:
-            processed_lines.append(line)
 
     processed_lines_count = len(processed_lines)
 
