@@ -161,7 +161,8 @@ def find_sub_list(lst: List, needle: List) -> List[int]:
 
 
 def revise_patch(patch: str, project_path: str) -> Tuple[str, bool]:
-    def revise_hunk(lines: list[str]) -> tuple[str, bool]:
+    def revise_hunk(lines: list[str], target_file_lines: list[str]) -> tuple[str, bool]:
+        fixed = False
         # fix wrong line number
         if len(lines[-1]) == 0 or "\ No newline at end of file" in lines[-1]:
             lines = lines[:-1]
@@ -172,23 +173,47 @@ def revise_patch(patch: str, project_path: str) -> Tuple[str, bool]:
         chunks = re.findall(r"@@ -(\d+),(\d+) \+(\d+),(\d+) @@(.*)", lines[0])[0]
         if chunks[0] != chunks[2]:
             fixed = True
-
-        # fix corrupt patch
-        revised_lines = []
-        for line in lines[1:]:
-            if len(line) == 0:
-                revised_lines.append(" ")
-            elif line.startswith("\t"):
-                revised_lines.append(" " + line)
-            else:
-                revised_lines.append(line)
-
-        hunk = "\n".join(revised_lines)
-
         header = f"@@ -{chunks[0]},{orignal_line_number} +{chunks[2]},{patched_line_number} @@{chunks[4]}\n"
 
-        fixed = True
-        return header + hunk, fixed
+        # fix corrupt patch
+        tmp_lines = []
+        for line in lines[1:]:
+            if len(line) == 0:
+                tmp_lines.append(" ")
+            elif line.startswith("\t"):
+                tmp_lines.append(" " + line)
+            else:
+                tmp_lines.append(line)
+
+        # fix mismatch context
+        contexts, num_context = extract_context("\n".join(tmp_lines))
+        lineno, _ = find_most_similar_block(
+            "\n".join(contexts), target_file_lines, num_context
+        )
+
+        i = 0
+        revised_lines = []
+        for line in tmp_lines:
+            if line.startswith(" "):
+                sign = " "
+            elif line.startswith("-"):
+                sign = "-"
+            else:
+                # skip if the line is not context
+                revised_lines.append(line)
+                continue
+            # test if context same
+            # XXX: the first line of the hunk must be corresponding to the lineno
+            new_line = target_file_lines[lineno - 1 + i]
+            if line.strip() != new_line.strip():
+                revised_lines.append(sign + new_line.strip("\n"))
+                fixed = True
+            else:
+                revised_lines.append(line)
+            i += 1
+        revised_hunk = "\n".join(revised_lines)
+
+        return header + revised_hunk, fixed
 
     def revise_block(lines: list[str]) -> tuple[list[str], bool]:
         try:
@@ -217,16 +242,21 @@ def revise_patch(patch: str, project_path: str) -> Tuple[str, bool]:
             f"+++ b/{fixed_file_path_b}".replace("b/--- ", ""),
         ]
 
+        with open(os.path.join(project_path, file_path_a), "r") as f:
+            file_content = f.readlines()
+
         last_line = -1
         for line_no in range(2, len(lines)):
             if lines[line_no].startswith("@@"):
                 if last_line != -1:
-                    hunk_lines, hunk_fixed = revise_hunk(lines[last_line:line_no])
+                    hunk_lines, hunk_fixed = revise_hunk(
+                        lines[last_line:line_no], file_content
+                    )
                     fixed_lines.append(hunk_lines)
                     block_fixed = block_fixed or hunk_fixed
                 last_line = line_no
         if last_line != -1:
-            hunk_lines, hunk_fixed = revise_hunk(lines[last_line:])
+            hunk_lines, hunk_fixed = revise_hunk(lines[last_line:], file_content)
             fixed_lines.append(hunk_lines)
             block_fixed = block_fixed or hunk_fixed
 
