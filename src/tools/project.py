@@ -157,7 +157,7 @@ class Project:
                     lines = similar_lines
 
         startline = max(lineno - 1, 0)
-        endline = min(lineno + 5 + num_context, len(lines))
+        endline = min(lineno + num_context, len(lines))
         block = "Here are lines {} through {} of file {} for commit {}.\n".format(
             startline, endline, path, ref
         )
@@ -314,7 +314,7 @@ class Project:
             logger.debug(f"The completed patch file {f.name}")
         pps = utils.split_patch(complete_patch, False)
         for idx, pp in enumerate(pps):
-            revised_patch, fixed = utils.revise_patch(pp, self.dir)
+            revised_patch, fixed = utils.revise_patch(pp, self.dir, True)
             with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
                 f.write(revised_patch)
             try:
