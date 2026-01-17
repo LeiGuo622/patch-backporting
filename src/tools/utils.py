@@ -184,33 +184,27 @@ def revise_patch(
             else:
                 tmp_lines.append(" " + line)
 
-        # fix mismatch context
+        # fix mismatched lines
+        # force_flag: force to revise all mismatched lines, otherwise fix indentation only
+        # TODO: if the distance is close, it should be revised
+        # XXX: if the distance is far, it should not be revised
         contexts, num_context = extract_context(tmp_lines)
-        lineno, dist = find_most_similar_block(contexts, target_file_lines, num_context)
-
-        # XXX: maybe force to revise wrongly
-        # max_dist = 12 * num_context
-        # if dist > max_dist:
-        if not revise_context:
-            return header + "\n".join(tmp_lines), fixed
-
+        lineno, _ = find_most_similar_block(contexts, target_file_lines, num_context)
         i = 0
         revised_lines = []
         for line in tmp_lines:
-            if line.startswith(" "):
-                sign = " "
-            elif line.startswith("-"):
-                sign = "-"
+            if line.startswith(" ") or line.startswith("-"):
+                sign = line[0]
+                new_line = target_file_lines[lineno - 1 + i]
+                if revise_context:
+                    revised_lines.append(sign + new_line.strip("\n"))
+                elif line[1:].strip() == new_line.strip():
+                    revised_lines.append(sign + new_line.strip("\n"))
+                else:
+                    revised_lines.append(line)
+                i += 1
             else:
-                # skip if the line is not context
                 revised_lines.append(line)
-                continue
-            # test if context same
-            # XXX: the first line of the hunk must be corresponding to the lineno
-            new_line = target_file_lines[lineno - 1 + i]
-            revised_lines.append(sign + new_line.strip("\n"))
-            fixed = True
-            i += 1
 
         return header + "\n".join(revised_lines), fixed
 
