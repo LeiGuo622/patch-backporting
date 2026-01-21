@@ -66,7 +66,7 @@ def find_most_similar_files(target_filename: str, search_directory: str) -> List
 
 
 def find_most_similar_block(
-    code_lines: List[str], lines: List[str], snippet_num: int
+    code_lines: List[str], lines: List[str], snippet_num: int, dline_flag: bool = False
 ) -> Tuple[int, int]:
     """
     Finds the most similar block of code in a list of lines to a given code snippet.
@@ -88,7 +88,7 @@ def find_most_similar_block(
             Levenshtein.distance(code_lines[j], lines[i + j])
             for j in range(snippet_num)
         )
-        if distance < min_distance:
+        if distance < min_distance and not (dline_flag and lines[i].startswith("+")):
             min_distance = distance
             best_start_index = i + 1
 
@@ -189,15 +189,20 @@ def revise_patch(
         # TODO: if the distance is close, it should be revised
         # XXX: if the distance is far, it should not be revised
         contexts, num_context = extract_context(tmp_lines)
-        lineno, _ = find_most_similar_block(contexts, target_file_lines, num_context)
+        lineno, _ = find_most_similar_block(
+            contexts, target_file_lines, num_context, False
+        )
         i = 0
         revised_lines = []
         for line in tmp_lines:
             if line.startswith(" ") or line.startswith("-"):
                 sign = line[0]
-                new_line = target_file_lines[lineno - 1 + i]
+                if not target_file_lines:
+                    new_line = "no such file"
+                else:
+                    new_line = target_file_lines[lineno - 1 + i]
                 if revise_context:
-                    revised_lines.append(sign + new_line.strip("\n"))
+                    revised_lines.append(" " + new_line.strip("\n"))
                 elif line[1:].strip() == new_line.strip():
                     revised_lines.append(sign + new_line.strip("\n"))
                 else:
@@ -205,6 +210,20 @@ def revise_patch(
                 i += 1
             else:
                 revised_lines.append(line)
+
+        if revise_context:
+            for line in tmp_lines:
+                if not line.startswith("-"):
+                    continue
+                dline = []
+                dline.append(line[1:])
+                dlineno, dist = find_most_similar_block(dline, revised_lines, 1, True)
+                revised_lines[dlineno - 1] = "-" + revised_lines[dlineno - 1][1:]
+
+            if not revised_lines[-1].startswith(" "):
+                revised_lines.append(
+                    " " + target_file_lines[lineno - 1 + i].strip("\n")
+                )
 
         return header + "\n".join(revised_lines), fixed
 
@@ -234,10 +253,12 @@ def revise_patch(
             f"--- a/{fixed_file_path_a}".replace("a/--- ", ""),
             f"+++ b/{fixed_file_path_b}".replace("b/--- ", ""),
         ]
-
-        with open(os.path.join(project_path, file_path_a), "r") as f:
-            file_content = [line.rstrip("\n") for line in f]
-
+        try:
+            with open(os.path.join(project_path, file_path_a), "r") as f:
+                file_content = [line.rstrip("\n") for line in f]
+        except:
+            file_content = []
+            logger.debug("File path in patch did not exist!")
         last_line = -1
         for line_no in range(2, len(lines)):
             if lines[line_no].startswith("@@"):
