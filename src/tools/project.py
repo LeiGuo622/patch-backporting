@@ -377,10 +377,11 @@ class Project:
             logger.debug(error_lines)
             ret += "The source code could not be COMPILED successfully after applying the patch. "
             ret += "Next I'll give you the error message during compiling, and you should modify the error patch. "
-            ret += f"Here is the error message:\n{compile_result}\n"
+            ret += f"Here is the error message:\n{error_lines}\n"
             ret += "Please revise the patch with above error message. "
             ret += "Or use tools `locate_symbol` and `viewcode` to re-check patch-related code snippet. "
             ret += "Please DO NOT send the same patch to me, repeated patches will harm the lives of others.\n"
+            self.repo.git.reset("--hard")
         else:
             logger.info(f"Compilation                       PASS")
             ret += "The patched source code could be COMPILED successfully! I really thank you for your great efforts.\n"
