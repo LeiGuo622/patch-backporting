@@ -148,7 +148,7 @@ class Project:
                 content = file.data_stream.read().decode("utf-8")
                 similar_lines = content.split("\n")
                 current_line, current_dist = utils.find_most_similar_block(
-                    "\n".join(contexts), similar_lines, num_context, False
+                    "\n".join(contexts), similar_lines, num_context
                 )
 
                 if current_dist < min_distance:
