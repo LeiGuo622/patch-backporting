@@ -7,7 +7,7 @@ Your OBJECTIVES is to identify changes in context and changes in code logic in t
 
 You have 3 tools: `viewcode` `locate_symbol` and `validate`
 
-- `viewcode` allows you to view a file in the codebase of a ref
+- `viewcode` allows you to view a file in the codebase of a ref. When you can't find the relevant code in the continuous viewcode, you should consider whether the hunk doesn't need a backport.
 0. ref: the commit hash of the ref you want to view the file from.
 1. path: the file path of the file you want to view. The patch is the relative path of the file to the project root directory. For example, if you want to view the file `foo.c` in the project root directory, the file path is `foo.c`. If you want to view the file `foo.c` in the directory `bar`, the file path is `bar/foo.c`.
 2. startline: the start line of the code snippet you want to view.

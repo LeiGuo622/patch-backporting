@@ -148,7 +148,7 @@ class Project:
                 content = file.data_stream.read().decode("utf-8")
                 similar_lines = content.split("\n")
                 current_line, current_dist = utils.find_most_similar_block(
-                    "\n".join(contexts), similar_lines, num_context
+                    "\n".join(contexts), similar_lines, num_context, False
                 )
 
                 if current_dist < min_distance:
@@ -289,7 +289,9 @@ class Project:
         self.repo.git.reset("--hard")
         return ret
 
-    def _compile_patch(self, ref: str, complete_patch: str) -> str:
+    def _compile_patch(
+        self, ref: str, complete_patch: str, revise_context: bool = False
+    ) -> str:
         """
         If all hunks could be applied successfully, compiles the patched source code after applying the joined patch.
 
@@ -312,7 +314,7 @@ class Project:
             logger.debug(f"The completed patch file {f.name}")
         pps = utils.split_patch(complete_patch, False)
         for idx, pp in enumerate(pps):
-            revised_patch, fixed = utils.revise_patch(pp, self.dir, True)
+            revised_patch, fixed = utils.revise_patch(pp, self.dir, revise_context)
             with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
                 f.write(revised_patch)
             try:
@@ -504,7 +506,10 @@ class Project:
         if self.all_hunks_applied_succeeded:
             ret = ""
             if not self.compile_succeeded:
-                ret += self._compile_patch(ref, patch)
+                ret += self._compile_patch(
+                    ref, patch, True if self.context_mismatch_times >= 1 else False
+                )
+                self.context_mismatch_times += 1
             if self.compile_succeeded and not self.testcase_succeeded:
                 ret += self._run_testcase()
             if (

@@ -59,7 +59,7 @@ def do_backport(
                     r"version.\n(.*?)\nBesides,", ret, re.DOTALL
                 )[0]
             except:
-                similar_block = "Something error in finding similar block\n"
+                similar_block = "Something error in finding similar block\n" + ret
                 logger.warning("Something error in finding similar block")
             logger.debug(f"Hunk {idx} can not be applied, using LLM to generate a fix")
             agent_executor.invoke(
@@ -87,7 +87,7 @@ def do_backport(
         if os.path.exists(f"{data.project_dir}{file}"):
             os.remove(f"{data.project_dir}{file}")
         os.symlink(f"{data.patch_dataset_dir}{file}", f"{data.project_dir}{file}")
-
+    project.context_mismatch_times = 0
     validate_ret = project._validate(data.target_release, complete_patch)
     if project.poc_succeeded:
         logger.info(
