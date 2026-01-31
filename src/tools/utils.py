@@ -66,33 +66,53 @@ def find_most_similar_files(target_filename: str, search_directory: str) -> List
 
 
 def find_most_similar_block(
-    code_lines: List[str], lines: List[str], snippet_num: int, dline_flag: bool = False
+    pattern: List[str], main: List[str], p_len: int, dline_flag: bool = False
 ) -> Tuple[int, int]:
     """
-    Finds the most similar block of code in a list of lines to a given code snippet.
+    Finds the most similar block of lines in the main list compared to the pattern list using Levenshtein distance.
 
     Args:
-        code_snippet (str): The code snippet to compare against.
-        lines (List[str]): The list of lines containing code blocks.
-        snippet_num (int): The number of lines in the code snippet.
+        pattern (List[str]): The list of code lines to match.
+        main (List[str]): The list of lines to search within.
+        p_len (int): The length of the pattern.
+        dline_flag (bool, optional): A flag indicating whether to ignore lines starting with '+' or '-'. Defaults to False.
 
     Returns:
-        int: The index of the start line of the most similar block.
-        int: Minimum Edit Distance.
+        Tuple[int, int]: A tuple containing the starting index of the most similar block in the main list (1-based index)
+                         and the minimum Levenshtein distance.
     """
     min_distance = float("inf")
     best_start_index = 1
 
-    for i in range(len(lines) - snippet_num + 1):
-        distance = sum(
-            Levenshtein.distance(code_lines[j], lines[i + j])
-            for j in range(snippet_num)
+    for i in range(len(main) - p_len + 1):
+        distance = Levenshtein.distance(
+            "\n".join(main[i : i + p_len]), "\n".join(pattern)
         )
         if distance < min_distance and not (
-            dline_flag and (lines[i].startswith("+") or lines[i].startswith("-"))
+            dline_flag and (main[i].startswith("+") or main[i].startswith("-"))
         ):
             min_distance = distance
             best_start_index = i + 1
+
+    # try to fix offset, align the pattern with the most similar block
+    if not dline_flag:
+        offset_flag = False
+        offset = 0
+        lineno = best_start_index
+        for i in range(p_len):
+            if len(pattern[i].strip()) < 3:
+                continue
+            for j in range(-5, 6):
+                try:
+                    if pattern[i].strip() == main[lineno - 1 + j].strip():
+                        offset = j - i
+                        offset_flag = True
+                        break
+                except:
+                    pass
+            if offset_flag:
+                break
+        best_start_index += offset
 
     return best_start_index, min_distance
 
@@ -184,6 +204,7 @@ def revise_patch(
                 revised_lines.append(line.replace("'s ", "->"))
 
         if revise_context:
+            logger.debug("force to revise all context lines")
             last_line = 0
             for line in tmp_lines:
                 if not line.startswith("-"):
