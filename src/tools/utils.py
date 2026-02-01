@@ -159,17 +159,8 @@ def revise_patch(
     def revise_hunk(lines: list[str], target_file_lines: list[str]) -> tuple[str, bool]:
         """fix lines from "@@" to the end"""
         fixed = False
-        # fix wrong line number
         if len(lines[-1]) == 0 or "\ No newline at end of file" in lines[-1]:
             lines = lines[:-1]
-        orignal_line_number = sum(1 for line in lines[1:] if not line.startswith("+"))
-        patched_line_number = sum(1 for line in lines[1:] if not line.startswith("-"))
-        # @@ -3357,10 +3357,16 @@
-        # extract the line number and the number of lines
-        chunks = re.findall(r"@@ -(\d+),(\d+) \+(\d+),(\d+) @@(.*)", lines[0])[0]
-        if chunks[0] != chunks[2]:
-            fixed = True
-        header = f"@@ -{chunks[0]},{orignal_line_number} +{chunks[2]},{patched_line_number} @@{chunks[4]}\n"
 
         # fix corrupt patch
         tmp_lines = []
@@ -222,6 +213,18 @@ def revise_patch(
                 revised_lines.append(
                     " " + target_file_lines[lineno - 1 + i].strip("\n")
                 )
+
+        # fix wrong line number
+        orignal_line_number = sum(
+            1 for line in revised_lines if not line.startswith("+")
+        )
+        patched_line_number = sum(
+            1 for line in revised_lines if not line.startswith("-")
+        )
+        chunks = re.findall(r"@@ -(\d+),(\d+) \+(\d+),(\d+) @@(.*)", lines[0])[0]
+        if chunks[0] != chunks[2]:
+            fixed = True
+        header = f"@@ -{chunks[0]},{orignal_line_number} +{chunks[2]},{patched_line_number} @@{chunks[4]}\n"
 
         return header + "\n".join(revised_lines), fixed
 
