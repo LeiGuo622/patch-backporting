@@ -2,6 +2,7 @@ import os
 import re
 import subprocess
 import tempfile
+from types import SimpleNamespace
 from typing import List, Tuple
 
 from git import Repo
@@ -12,15 +13,18 @@ from tools.logger import logger
 
 
 class Project:
-    def __init__(self, project_url: str, dir: str, err_msg: str):
-        self.project_url = project_url
-        self.dir = dir
-        self.repo = Repo(dir)
+    def __init__(self, data: SimpleNamespace):
+        self.project_url = data.project_url
+        self.dir = data.project_dir
+        self.repo = Repo(data.project_dir)
 
-        if not err_msg:
-            err_msg = "no err_msg"
-        self.err_msg = err_msg
+        if not data.error_message:
+            self.err_msg = "no err_msg"
+        else:
+            self.err_msg = data.error_message
 
+        self.new_patch_parent = data.new_patch_parent
+        self.target_release = data.target_release
         self.succeeded_patches = []
         self.context_mismatch_times = 0
         self.round_succeeded = False
@@ -196,30 +200,50 @@ class Project:
             str: If the file is found, return the current file path. Else, return all possible file paths.
         """
         ret = ""
+        file_paths = []
         missing_file_path = re.findall(r"--- a/(.*)", old_patch)[0]
 
+        # locate file by git diff
+        diff_args = [
+            "--diff-filter=R",
+            "--name-status",
+            "--follow",
+            self.target_release,
+            self.new_patch_parent,
+            "--",
+            missing_file_path,
+        ]
+        file_diff = self.repo.git.diff(diff_args)
+        if file_diff:
+            file_path = file_diff.split("\t")[1]
+            logger.debug(
+                f"We have found the patch's file path is {file_path} at target release by git diff."
+            )
+            file_paths.append(file_path)
+
         # locate target file by symbol or utils.find_most_similar_files
-        try:
-            # XXX: find symbol: the word before the first '{' or '('
-            # @@ -135,7 +135,6 @@ struct ksmbd_transport_ops {
-            # @@ -416,13 +416,7 @@ static void stop_sessions(void)
-            symbol_name = re.findall(r"\b\w+(?=\s*[{\(])", old_patch)[0]
-            symbol_locations = self._locate_symbol(ref, symbol_name)
-            if not symbol_locations:
-                logger.debug(
-                    f"No {missing_file_path} and no {symbol_name} in the repo."
-                )
+        if not file_paths:
+            try:
+                # XXX: find symbol: the word before the first '{' or '('
+                # @@ -135,7 +135,6 @@ struct ksmbd_transport_ops {
+                # @@ -416,13 +416,7 @@ static void stop_sessions(void)
+                symbol_name = re.findall(r"\b\w+(?=\s*[{\(])", old_patch)[0]
+                symbol_locations = self._locate_symbol(ref, symbol_name)
+                if not symbol_locations:
+                    logger.debug(
+                        f"No {missing_file_path} and no {symbol_name} in the repo."
+                    )
+                    file_paths = utils.find_most_similar_files(
+                        missing_file_path.split("/")[-1], self.dir
+                    )
+                else:
+                    logger.debug(f"Find {symbol_name} in {symbol_locations}.")
+                    file_paths = [item[0] for item in symbol_locations]
+            except:
+                logger.debug("Can not find a symbol in given patch.")
                 file_paths = utils.find_most_similar_files(
                     missing_file_path.split("/")[-1], self.dir
                 )
-            else:
-                logger.debug(f"Find {symbol_name} in {symbol_locations}.")
-                file_paths = [item[0] for item in symbol_locations]
-        except:
-            logger.debug("Can not find a symbol in given patch.")
-            file_paths = utils.find_most_similar_files(
-                missing_file_path.split("/")[-1], self.dir
-            )
 
         # try to apply patch to the target files
         find_file = False

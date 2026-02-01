@@ -125,7 +125,7 @@ def main():
     add_file_handler(logger, logfile)
 
     # use LLM to backport
-    project = Project(data.project_url, data.project_dir, data.error_message)
+    project = Project(data)
     project.repo.git.clean("-fdx")
 
     before_usage = get_usage(data.openai_key)
