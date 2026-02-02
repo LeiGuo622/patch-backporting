@@ -30,8 +30,8 @@ def initial_agent(project: Project, api_key: str, debug_mode: bool):
             MessagesPlaceholder(variable_name="agent_scratchpad"),
         ]
     )
-    viewcode, locate_symbol, validate = project.get_tools()
-    tools = [viewcode, locate_symbol, validate]
+    viewcode, locate_symbol, validate, git_history, git_show = project.get_tools()
+    tools = [viewcode, locate_symbol, validate, git_history, git_show]
     agent = create_tool_calling_agent(llm, tools, prompt)
     agent_executor = AgentExecutor(
         agent=agent, tools=tools, verbose=debug_mode, max_iterations=30
@@ -104,8 +104,9 @@ def do_backport(
             MessagesPlaceholder(variable_name="agent_scratchpad"),
         ]
     )
-    viewcode, locate_symbol, validate = project.get_tools()
-    tools = [viewcode, locate_symbol, validate]
+    # XXX maybe refactor initial_agent function to cover
+    viewcode, locate_symbol, validate, git_history, git_show = project.get_tools()
+    tools = [viewcode, locate_symbol, validate, git_history, git_show]
     agent = create_tool_calling_agent(llm, tools, prompt)
     agent_executor = AgentExecutor(
         agent=agent, tools=tools, verbose=True, max_iterations=20

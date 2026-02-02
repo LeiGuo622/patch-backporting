@@ -122,6 +122,30 @@ class Project:
         else:
             return None
 
+    def _git_history() -> str:
+        """
+
+
+        Returns:
+            XXX(str):
+        """
+
+    def _git_show(ref: str) -> str:
+        """
+        Show commit message for a specific ref when LLM need.
+
+        Args:
+            ref (str): The reference of the target repository.
+
+        Returns:
+            message(str): The commit message of ref
+        """
+        try:
+            # XXX maybe too much context will confuse LLM, how could we refine it.
+            return self.repo.git.show(f"{ref}")
+        except:
+            return "Error commit id, please check if the commit id is correct."
+
     def _apply_error_handling(self, ref: str, revised_patch: str) -> Tuple[str, str]:
         """
         Generate feedback to llm when an error patch is applied.
@@ -562,6 +586,8 @@ class Project:
             creat_viewcode_tool(self),
             creat_locate_symbol_tool(self),
             create_validate_tool(self),
+            create_git_history_tool(self),
+            create_git_show_tool(self),
         )
 
 
@@ -600,3 +626,25 @@ def create_validate_tool(project: Project):
         return project._validate(ref, patch)
 
     return validate
+
+
+def create_git_history_tool(project: Project):
+    @tool
+    def git_history() -> str:
+        """
+        get history for lines which relate to patch hunk.
+        """
+        return project._git_history()
+
+    return git_history
+
+
+def create_git_show_tool(project: Project):
+    @tool
+    def git_show() -> str:
+        """
+        get history for lines which relate to patch hunk.
+        """
+        return project._git_show()
+
+    return git_show
