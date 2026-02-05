@@ -40,7 +40,7 @@ def main():
         if os.path.exists(f"{data.project_dir}{file}"):
             os.remove(f"{data.project_dir}{file}")
         os.symlink(f"{data.patch_dataset_dir}{file}", f"{data.project_dir}{file}")
-    project = Project(data.project_url, data.project_dir, data.patch_dataset_dir)
+    project = Project(data)
 
     # HACK: call func to test patch here, for example, I call `_validate`
     revised_patch, _ = revise_patch(patch, project.dir)
@@ -59,20 +59,52 @@ def main():
 if __name__ == "__main__":
     # HACK: put the patch here
     patch = """
---- a/tools/tiffcp.c
-+++ b/tools/tiffcp.c
-@@ -1490,6 +1490,13 @@
- 		return 0;
- 	}
+diff --git a/net/tipc/link.c b/net/tipc/link.c
+index 8d9e09f48f4ca1..1e14d7f8f28f1d 100644
+--- a/net/tipc/link.c
++++ b/net/tipc/link.c
+@@ -2200,7 +2200,7 @@ static int tipc_link_proto_rcv(struct tipc_link *l, struct sk_buff *skb,
+ 	struct tipc_msg *hdr = buf_msg(skb);
+ 	struct tipc_gap_ack_blks *ga = NULL;
+ 	bool reply = msg_probe(hdr), retransmitted = false;
+-	u16 dlen = msg_data_sz(hdr), glen = 0;
++	u32 dlen = msg_data_sz(hdr), glen = 0;
+ 	u16 peers_snd_nxt =  msg_next_sent(hdr);
+ 	u16 peers_tol = msg_link_tolerance(hdr);
+ 	u16 peers_prio = msg_linkprio(hdr);
+@@ -2214,6 +2214,10 @@ static int tipc_link_proto_rcv(struct tipc_link *l, struct sk_buff *skb,
+ 	void *data;
+ 
+ 	trace_tipc_proto_rcv(skb, false, l->name);
 +
-+	if ((imagew - tilew * spp) > INT_MAX) {
-+		TIFFError(TIFFFileName(in),
-+		          "Error, image raster scan line size is too large");
-+		return 0;
-+	}
++	if (dlen > U16_MAX)
++		goto exit;
 +
- 	iskew = imagew - tilew*spp;
- 	tilebuf = limitMalloc(tilesize);
- 	if (tilebuf == 0)
+ 	if (tipc_link_is_blocked(l) || !xmitq)
+ 		goto exit;
+ 
+@@ -2309,7 +2313,8 @@ static int tipc_link_proto_rcv(struct tipc_link *l, struct sk_buff *skb,
+ 
+ 		/* Receive Gap ACK blocks from peer if any */
+ 		glen = tipc_get_gap_ack_blks(&ga, l, hdr, true);
+-
++		if(glen > dlen)
++			break;
+ 		tipc_mon_rcv(l->net, data + glen, dlen - glen, l->addr,
+ 			     &l->mon_state, l->bearer_id);
+ 
+diff --git a/net/tipc/monitor.c b/net/tipc/monitor.c
+index 407619697292f3..2f4d23238a7e33 100644
+--- a/net/tipc/monitor.c
++++ b/net/tipc/monitor.c
+@@ -496,6 +496,8 @@ void tipc_mon_rcv(struct net *net, void *data, u16 dlen, u32 addr,
+ 	state->probing = false;
+ 
+ 	/* Sanity check received domain record */
++	if (new_member_cnt > MAX_MON_DOMAIN)
++		return;
+ 	if (dlen < dom_rec_len(arrv_dom, 0))
+ 		return;
+ 	if (dlen != dom_rec_len(arrv_dom, new_member_cnt))
 """
     main()
