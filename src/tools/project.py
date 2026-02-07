@@ -150,7 +150,7 @@ class Project:
                 f"-L {start_line},{end_line}:{filepath}",
                 f"{start_commit}..{self.new_patch_parent}",
             )
-
+            # save each hunk related refs
             if self.now_hunk_num not in self.hunk_log_info:
                 sha_lines = re.findall(
                     r".*\b[0-9a-fA-F]{12}\b.*", log_message, re.MULTILINE
@@ -161,9 +161,11 @@ class Project:
             return log_message
 
         else:
+            # XXX TBD
+            # JUST return each hunk related refs
             pass
 
-    def _git_show(self, ref: str) -> str:
+    def _git_show(self) -> str:
         """
         Show commit message for a specific ref when LLM need.
 
@@ -175,9 +177,12 @@ class Project:
         """
         try:
             # XXX maybe too much context will confuse LLM, how could we refine it.
-            return self.repo.git.show(f"{ref}")
+            ref_line = self.hunk_log_info[self.now_hunk_num][-1]
+            ref = ref_line.split(" ")[0].strip()
+            ret = self.repo.git.show(f"{ref}")
+            return ret[: min(10001, len(ret))]
         except:
-            return "Error commit id, please check if the commit id is correct."
+            return "Something error, maybe you don't use git_history before or git_history is empty."
 
     def _apply_error_handling(self, ref: str, revised_patch: str) -> Tuple[str, str]:
         """
@@ -674,10 +679,10 @@ def create_git_history_tool(project: Project):
 
 def create_git_show_tool(project: Project):
     @tool
-    def git_show(ref: str) -> str:
+    def git_show() -> str:
         """
         show change log for a specific ref
         """
-        return project._git_show(ref)
+        return project._git_show()
 
     return git_show
