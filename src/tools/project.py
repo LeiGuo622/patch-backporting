@@ -5,6 +5,7 @@ import tempfile
 from types import SimpleNamespace
 from typing import List, Tuple
 
+import Levenshtein
 from git import Repo
 from langchain_core.tools import tool
 
@@ -121,9 +122,29 @@ class Project:
             self._prepare(ref)
 
         if symbol in self.symbol_map[ref]:
-            return self.symbol_map[ref][symbol]
-        else:
-            return None
+            return "\n".join(
+                [f"{file}:{line}" for file, line in self.symbol_map[ref][symbol]]
+            )
+
+        symbols = self.symbol_map.get(ref, {})
+        most_similar = None
+        smallest_distance = float("inf")
+
+        for symbol_i in symbols.keys():
+            # 计算 Levenshtein 距离
+            distance = Levenshtein.distance(symbol, symbol_i)
+            if distance < smallest_distance:
+                smallest_distance = distance
+                most_similar = symbol_i
+
+        ret = f"The symbol {symbol} you are looking for does not exist in the current ref.\n"
+        ret += f"But here is a symbol similar to it. It's `{most_similar}`.\n"
+        ret += f"The file where this symbol is located is: \n"
+        ret += "\n".join(
+            [f"{file}:{line}" for file, line in symbols.get(most_similar, None)]
+        )
+        ret += f"\nPlease be careful to check that this symbol indicates the same thing as the previous symbol.\n"
+        return ret
 
     def _git_history(self) -> str:
         """
@@ -643,7 +664,7 @@ def creat_locate_symbol_tool(project: Project):
         """
         res = project._locate_symbol(ref, symbol)
         if res is not None:
-            return "\n".join([f"{file}:{line}" for file, line in res])
+            return res
         else:
             return "Symbol not found"
 
