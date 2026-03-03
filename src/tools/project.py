@@ -122,10 +122,24 @@ class Project:
             self._prepare(ref)
 
         if symbol in self.symbol_map[ref]:
-            return "\n".join(
-                [f"{file}:{line}" for file, line in self.symbol_map[ref][symbol]]
-            )
+            return self.symbol_map[ref][symbol]
+        else:
+            return None
 
+    def _locate_similar_symbol(
+        self, ref: str, symbol: str
+    ) -> List[Tuple[str, int]] | None:
+        """
+        Locate the most similar symbol with llm need in a specific ref of the target repository.
+
+        Args:
+            ref (str): The reference of the target repository.
+            symbol (str): The symbol to locates.
+
+        Returns:
+            List[Tuple[str, int]] : File path and code lines for the most similar symbol.
+        """
+        # XXX: Analyzing ctags file everytime locate symbol is time-consuming.
         symbols = self.symbol_map.get(ref, {})
         most_similar = None
         smallest_distance = float("inf")
@@ -137,14 +151,7 @@ class Project:
                 smallest_distance = distance
                 most_similar = symbol_i
 
-        ret = f"The symbol {symbol} you are looking for does not exist in the current ref.\n"
-        ret += f"But here is a symbol similar to it. It's `{most_similar}`.\n"
-        ret += f"The file where this symbol is located is: \n"
-        ret += "\n".join(
-            [f"{file}:{line}" for file, line in symbols.get(most_similar, None)]
-        )
-        ret += f"\nPlease be careful to check that this symbol indicates the same thing as the previous symbol.\n"
-        return ret
+        return symbols.get(most_similar), most_similar
 
     def _git_history(self) -> str:
         """
@@ -664,8 +671,14 @@ def creat_locate_symbol_tool(project: Project):
         """
         res = project._locate_symbol(ref, symbol)
         if res is not None:
-            return res
+            return "\n".join([f"{file}:{line}" for file, line in res])
         else:
+            res, most_similar = project._locate_similar_symbol(ref, symbol)
+            ret = f"The symbol {symbol} you are looking for does not exist in the current ref.\n"
+            ret += f"But here is a symbol similar to it. It's `{most_similar}`.\n"
+            ret += f"The file where this symbol is located is: \n"
+            ret += "\n".join([f"{file}:{line}" for file, line in res])
+            ret += f"\nPlease be careful to check that this symbol indicates the same thing as the previous symbol.\n"
             return "Symbol not found"
 
     return locate_symbol
