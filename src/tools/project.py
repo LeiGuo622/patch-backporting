@@ -201,14 +201,14 @@ class Project:
                 ) = utils.extract_context(last_context.split("\n")[3:])
                 self.add_percent = add_line_num / (add_line_num + context_line_num)
 
-                sha_lines = re.findall(
-                    r".*\b[0-9a-fA-F]{12}\b.*", log_message, re.MULTILINE
-                )
                 self.hunk_log_info[self.now_hunk_num] = []
-                for line in sha_lines:
-                    self.hunk_log_info[self.now_hunk_num].append(line)
+                patch_list = log_message.split("\n")
+                for idx, line in enumerate(patch_list):
+                    if line.startswith("diff --git"):
+                        sha_num = patch_list[idx - 2].split(" ")[0]
+                        self.hunk_log_info[self.now_hunk_num].append(sha_num)
 
-            ret = log_message
+            ret = log_message[len(log_message) - 5001 : -1]
             ret += "\nYou need to do the following analysis based on the information in the last commit:\n"
             ret += "Analyze the code logic of the context of the patch to be ported in this commit step by step.\n"
             ret += "If code logic already existed before this commit, the patch context can be assumed to remain in a similar location. Use `locate` and `viewcode` to check your results.\n"
@@ -461,7 +461,8 @@ class Project:
                 find_ret = self._apply_file_move_handling(ref, revised_patch)
                 ret += find_ret
             elif "corrupt patch" in e.stderr:
-                raise Exception("Unexpected corrupt patch")
+                ret = "Unexpected corrupt patch"
+                # raise Exception("Unexpected corrupt patch")
             else:
                 logger.debug(f"Context mismatch")
                 ret += "This patch does not apply because of CONTEXT MISMATCH. Context are patch lines that already exist in the file, that is, lines starting with ` ` and `-`. You should modify the error patch according to the context of older version.\n"
