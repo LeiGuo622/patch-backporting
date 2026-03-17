@@ -2,6 +2,7 @@ import argparse
 import datetime
 import logging
 import os
+import shutil
 import time
 from types import SimpleNamespace
 
@@ -19,6 +20,15 @@ def is_commit_valid(commit_id: str, project_dir: str):
         repo = git.Repo(project_dir)
         repo.commit(commit_id)
         return True
+    except git.exc.BadName:
+        logger.error(f"Commit id {commit_id} in .yml is invalid.")
+        return False
+
+
+def rev_parse_commit(commit_id: str, project_dir: str):
+    try:
+        repo = git.Repo(project_dir)
+        return repo.git.rev_parse(commit_id)
     except git.exc.BadName:
         logger.error(f"Commit id {commit_id} in .yml is invalid.")
         return False
@@ -96,6 +106,11 @@ def load_yml(file_path: str):
     ):
         exit(1)
 
+    data.new_patch = rev_parse_commit(data.new_patch, data.project_dir)
+    data.target_release = rev_parse_commit(data.target_release, data.project_dir)
+    data.new_patch_parent = rev_parse_commit(data.new_patch_parent, data.project_dir)
+    print(data)
+
     return data
 
 
@@ -147,8 +162,9 @@ def main():
             f"This patch total cost time: {int(end_time - start_time)} Seconds."
         )
     except KeyboardInterrupt:
+        logger.debug("Start to calculate cost!")
         end_time = time.time()
-        time.sleep(10)
+
         after_usage = get_usage(data.openai_key)
         logger.debug(
             f"This patch total cost: ${(after_usage['total_cost'] - before_usage['total_cost']):.2f}"
@@ -159,6 +175,8 @@ def main():
         logger.debug(
             f"This patch total cost time: {int(end_time - start_time)} Seconds."
         )
+
+    shutil.copy(logfile, data.patch_dataset_dir)
 
 
 if __name__ == "__main__":
