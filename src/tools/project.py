@@ -99,7 +99,7 @@ class Project:
             file = self.repo.tree(ref) / path
         except:
             return "This file doesn't exist in this commit."
-        content = file.data_stream.read().decode("utf-8")
+        content = file.data_stream.read().decode("utf-8", errors="ignore")
         lines = content.split("\n")
         ret = []
         if endline > len(lines):
@@ -305,7 +305,7 @@ class Project:
 
         try:
             file = self.repo.tree(ref) / path
-            content = file.data_stream.read().decode("utf-8")
+            content = file.data_stream.read().decode("utf-8", errors="ignore")
             lines = content.split("\n")
             lineno, dist = utils.find_most_similar_block(
                 contexts, lines, num_context, False
@@ -314,7 +314,7 @@ class Project:
             similar_files = utils.find_most_similar_files(path.split("/")[-1], self.dir)
             for similar_file in similar_files:
                 file = self.repo.tree(ref) / similar_file
-                content = file.data_stream.read().decode("utf-8")
+                content = file.data_stream.read().decode("utf-8", errors="ignore")
                 similar_lines = content.split("\n")
                 current_line, current_dist = utils.find_most_similar_block(
                     "\n".join(contexts), similar_lines, num_context, False
@@ -462,7 +462,7 @@ class Project:
                 find_ret = self._apply_file_move_handling(ref, revised_patch)
                 ret += find_ret
             elif "corrupt patch" in e.stderr:
-                ret = "Unexpected corrupt patch"
+                ret = "Unexpected corrupt patch, Please carefully check your answer, especially in your call tools arguments.\n"
                 # raise Exception("Unexpected corrupt patch")
             else:
                 logger.debug(f"Context mismatch")

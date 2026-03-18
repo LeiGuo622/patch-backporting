@@ -259,8 +259,9 @@ def revise_patch(
             f"+++ b/{fixed_file_path_b}".replace("b/--- ", ""),
         ]
         try:
-            with open(os.path.join(project_path, file_path_a), "r") as f:
-                file_content = [line.rstrip("\n") for line in f]
+            with open(os.path.join(project_path, file_path_a), "rb") as f:
+                content = f.read().decode("utf-8", errors="ignore")
+                file_content = [line.rstrip("\n") for line in content.splitlines()]
         except:
             # do not revise patch if file changed, handle changed file in `_apply_hunk`
             return lines, False
