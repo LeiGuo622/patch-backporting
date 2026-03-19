@@ -97,7 +97,7 @@ def find_most_similar_block(
     # try to fix offset, align the pattern with the most similar block
     if not dline_flag:
         offset_flag = False
-        offset = 0
+        offset = float("inf")
         lineno = best_start_index
         for i in range(p_len):
             if len(pattern[i].strip()) < 3:
@@ -105,14 +105,14 @@ def find_most_similar_block(
             for j in range(-5, 6):
                 try:
                     if pattern[i].strip() == main[lineno - 1 + j].strip():
-                        offset = j - i
                         offset_flag = True
-                        break
+                        if abs(j - i) < abs(offset):
+                            offset = j - i
                 except:
                     pass
             if offset_flag:
+                best_start_index += offset
                 break
-        best_start_index += offset
 
     return best_start_index, min_distance
 
