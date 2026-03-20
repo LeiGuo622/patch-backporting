@@ -30,7 +30,7 @@ def initial_agent(project: Project, data, debug_mode: bool):
         logger.info(f"Using Azure OpenAI: {azure_endpoint} (deployment: {azure_deployment})")
 
         llm = AzureChatOpenAI(
-            temperature=1.0,
+            temperature=1.0,  # Set to 1.0 for GPT-5 model; can be changed if using other models
             azure_deployment=azure_deployment,
             api_key=api_key,
             azure_endpoint=azure_endpoint,
