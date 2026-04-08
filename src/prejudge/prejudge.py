@@ -15,10 +15,16 @@ from typing import Dict, List, Set
 class PrejudgeController:
     """Main controller for pre-judging kernel commits"""
 
-    def __init__(self, kernel_dir: str):
+    def __init__(self, kernel_dir: str, target_project_dir: str):
         self.kernel_dir = Path(kernel_dir).resolve()
         if not self.kernel_dir.exists():
             raise ValueError(f"Kernel directory not found: {kernel_dir}")
+        if not target_project_dir:
+            raise ValueError(f"Target project directory is required")
+        self.target_project_dir = Path(target_project_dir).resolve()
+        if not self.target_project_dir.exists():
+            raise ValueError(f"Target project directory not found: {target_project_dir}")
+
 
     def get_patch_from_commit(self, commit_id: str) -> str:
         """
@@ -54,6 +60,20 @@ class PrejudgeController:
             raise
 
         return Path(temp_path)
+    
+    def judge_fix(self, commit_id: str) -> bool:
+        """
+        Judge if the fix commits exist in the target project
+        Returns True if all fix commits exist (or no fix commits found), False otherwise
+        """
+        from judge_fix import FixCommitAnalyzer
+
+        try:
+            analyzer = FixCommitAnalyzer(str(self.kernel_dir), str(self.target_project_dir))
+            return analyzer.should_proceed(commit_id)
+        except Exception:
+            # If check fails, log error but allow proceeding
+            return True
 
     def judge_config(self, patch_content: str) -> Set[str]:
         """
@@ -164,13 +184,21 @@ class PrejudgeController:
         Analyze a commit and print results
         Output format: true or false
         """
+         # Step 1: Check if fix commits exist in target project (before config checking)
+        fix_exists = self.judge_fix(commit_id)
+        if not fix_exists:
+            # Fix commits don't exist in target project, no need to check config
+            print("false")
+            return
+
+        # Step 2: Get patch content
         patch_content = self.analyze_commit(commit_id)
 
         if not patch_content:
-            # No patch content, return True
+            # No patch content, return error message
             print("Error: Could not retrieve patch content. Please check the commit ID and repository.")
             return
-        
+        # Step 3: Analyze config requirements
         results = self.analyze_config(patch_content)
 
         # Check if any CONFIG is enabled in any architecture
@@ -183,22 +211,17 @@ class PrejudgeController:
 
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: prejudge.py <commit-id> [kernel-source-dir]")
+    if len(sys.argv) < 4:
+        print("Usage: prejudge.py <commit-id> <kernel-source-dir> <target-project-dir>")
         sys.exit(1)
 
     commit_id = sys.argv[1]
+    kernel_dir = sys.argv[2]
 
-    # Default kernel directory
-    if len(sys.argv) >= 3:
-        kernel_dir = sys.argv[2]
-    else:
-        # Try to find kernel directory
-        script_dir = Path(__file__).parent.parent.parent
-        kernel_dir = script_dir / "data" / "linux"
+    target_project_dir = sys.argv[3]
 
     try:
-        controller = PrejudgeController(kernel_dir)
+        controller = PrejudgeController(kernel_dir, target_project_dir)
         controller.analyze_and_report(commit_id)
     except Exception:
         sys.exit(1)
