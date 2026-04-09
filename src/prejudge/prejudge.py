@@ -74,6 +74,20 @@ class PrejudgeController:
         except Exception:
             # If check fails, log error but allow proceeding
             return True
+        
+    def judge_arch(self, commit_id: str) -> bool:
+        """
+        Judge if the architecture changes are supported
+        Returns True if no arch changes or all arch changes are to supported architectures
+        """
+        from judge_arch import ArchAnalyzer
+
+        try:
+            analyzer = ArchAnalyzer(str(self.kernel_dir))
+            return analyzer.should_backport(commit_id)
+        except Exception:
+            # If check fails, allow proceeding
+            return True
 
     def judge_config(self, patch_content: str) -> Set[str]:
         """
@@ -207,7 +221,20 @@ class PrejudgeController:
             all_configs.update(items)
 
         is_enabled = self.check_config_in_arch_configs(all_configs)
-        print("true" if is_enabled else "false")
+        if not is_enabled:
+            # CONFIG not enabled in any architecture
+            print("false")
+            return
+
+        # Step 4: Check if architecture is supported (after config checking)
+        arch_supported = self.judge_arch(commit_id)
+        if not arch_supported:
+            # Architecture not supported
+            print("false")
+            return
+
+        # All checks passed
+        print("true")
 
 
 def main():
