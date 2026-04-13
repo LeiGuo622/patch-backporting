@@ -88,6 +88,21 @@ class PrejudgeController:
         except Exception:
             # If check fails, allow proceeding
             return True
+        
+    def judge_agent_llm(self, commit_id: str) -> bool:
+        """
+        Judge if the patch needs to be backported using LLM agent
+        Returns True if the vulnerable code exists in target kernel, False otherwise
+        """
+        from judge_llm import judge_with_llm
+
+        try:
+            result = judge_with_llm(commit_id, str(self.kernel_dir), str(self.target_project_dir))
+            return result
+        except Exception as e:
+            # If agent fails, log error but be conservative and return True
+            print(f"Warning: LLM agent check failed: {e}", file=sys.stderr)
+            return True
 
     def judge_config(self, patch_content: str) -> Set[str]:
         """
@@ -201,7 +216,7 @@ class PrejudgeController:
          # Step 1: Check if fix commits exist in target project (before config checking)
         fix_exists = self.judge_fix(commit_id)
         if not fix_exists:
-            # Fix commits don't exist in target project, no need to check config
+            # Fix commits don't exist in target project, no need to check further
             print("false")
             return
 
@@ -233,8 +248,11 @@ class PrejudgeController:
             print("false")
             return
 
-        # All checks passed
-        print("true")
+        # Step 5: Use LLM agent to check if vulnerable code exists in target kernel
+        agent_result = self.judge_agent_llm(commit_id)
+
+        # Output final result based on agent's decision
+        print("true" if agent_result else "false")
 
 
 def main():
