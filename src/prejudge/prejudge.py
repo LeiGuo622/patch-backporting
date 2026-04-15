@@ -217,7 +217,7 @@ class PrejudgeController:
         fix_exists = self.judge_fix(commit_id)
         if not fix_exists:
             # Fix commits don't exist in target project, no need to check further
-            print("false")
+            print("false, fix commits missing")
             return
 
         # Step 2: Get patch content
@@ -238,7 +238,7 @@ class PrejudgeController:
         is_enabled = self.check_config_in_arch_configs(all_configs)
         if not is_enabled:
             # CONFIG not enabled in any architecture
-            print("false")
+            print("false, arch not supported")
             return
 
         # Step 4: Check if architecture is supported (after config checking)
@@ -252,8 +252,7 @@ class PrejudgeController:
         agent_result = self.judge_agent_llm(commit_id)
 
         # Output final result based on agent's decision
-        print("true" if agent_result else "false")
-
+        print("true" if agent_result else "false, vulnerable code not found")
 
 def main():
     if len(sys.argv) < 4:
