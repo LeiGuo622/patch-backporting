@@ -35,12 +35,12 @@ def judge_with_llm(
     import sys
     from pathlib import Path
 
-    # Add src directory to path if needed
-    _src_path = Path(__file__).parent.parent
-    if str(_src_path) not in sys.path:
-        sys.path.insert(0, str(_src_path))
+    # Add the directory containing judge_agent to path
+    _prejudge_path = Path(__file__).parent
+    if str(_prejudge_path) not in sys.path:
+        sys.path.insert(0, str(_prejudge_path))
 
-    from prejudge.judge_agent import JudgeAgent
+    from judge_agent import JudgeAgent
 
     # Validate paths
     src_path = Path(src_project_path).resolve()

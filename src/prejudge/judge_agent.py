@@ -21,13 +21,16 @@ from langchain_openai import ChatOpenAI
 import sys
 from pathlib import Path
 
-# Add src directory to path for imports
+# Add current directory to path for imports
+_prejudge_path = Path(__file__).parent
 _src_path = Path(__file__).parent.parent
+if str(_prejudge_path) not in sys.path:
+    sys.path.insert(0, str(_prejudge_path))
 if str(_src_path) not in sys.path:
     sys.path.insert(0, str(_src_path))
 
-from prejudge.judge_tools import create_locate_symbol_tool, create_view_code_tool
-from prejudge.judge_prompt import JUDGE_SYSTEM_PROMPT, JUDGE_USER_PROMPT
+from judge_tools import create_locate_symbol_tool, create_view_code_tool
+from judge_prompt import JUDGE_SYSTEM_PROMPT, JUDGE_USER_PROMPT
 from tools.logger import logger
 
 
