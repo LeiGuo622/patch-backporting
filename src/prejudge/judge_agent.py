@@ -51,7 +51,7 @@ SUPPORTED_MODELS = {
     },
     "deepseek": {
         "name": "DeepSeek",
-        "default_model": "deepseek/deepseek-chat-v3-0324",
+        "default_model": "deepseek/deepseek-chat",
         "key_env_name": "OPENROUTER_API_KEY",
         "constructor": _openrouter_common,
     },
@@ -76,7 +76,7 @@ class JudgeAgent:
     def __init__(
         self,
         target_project_path: str,
-        model_provider: Literal["openai", "deepseek", "gemini", "claude"] = "claude",
+        model_provider: Literal["openai", "deepseek", "gemini", "claude"] = "openai",
         ref: str = "HEAD",
         debug_mode: bool = False,
     ):
