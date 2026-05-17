@@ -1,0 +1,4 @@
+interface:
+  display_name: "RetroPatch Engineering"
+  short_description: "RetroPatch repo workflow and code map"
+  default_prompt: "Use $retropatch-engineering to work safely and efficiently in the RetroPatch repository."
